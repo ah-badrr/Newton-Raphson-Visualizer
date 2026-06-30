@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Newton-Raphson Solver | Metode Numerik Interaktif</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  .mono { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace; }
+  .fade-in { animation: fadeIn .5s ease-out; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .table-wrap::-webkit-scrollbar { height: 8px; }
+  .table-wrap::-webkit-scrollbar-track { background: #1e293b; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
+  .chart-container { position: relative; height: 480px; }
+  @media (max-width: 640px) { .chart-container { height: 340px; } }
+  .info-card { transition: all .3s ease; }
+  .info-card:hover { transform: translateY(-2px); border-color: rgba(99,102,241,.5); }
+  .math-inline { font-family: 'JetBrains Mono', monospace; color: #a5b4fc; }
+  .bullet::before { content: "▸"; color: #6366f1; font-weight: bold; margin-right: 8px; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen">
+
+  <div class="fixed inset-0 -z-10 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950"></div>
+  <div class="fixed inset-0 -z-10 opacity-30"
+       style="background-image: radial-gradient(circle at 20% 10%, rgba(99,102,241,0.25), transparent 40%),
+                           radial-gradient(circle at 80% 80%, rgba(79,70,229,0.2), transparent 40%);"></div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
+    <!-- Header -->
+    <header class="mb-8 text-center">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-medium mb-4">
+        <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+        Metode Numerik · Visualisasi Interaktif
+      </div>
+      <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-tight">
+        Newton-Raphson <span class="text-indigo-400">Solver</span>
+      </h1>
+      <p class="mt-3 text-slate-400 max-w-2xl mx-auto">
+        Selesaikan akar persamaan non-linear <span class="mono">f(x) = 0</span>
+        dengan visualisasi geometris garis singgung dan analisis konvergensi mendalam.
+      </p>
+    </header>
+
+    <!-- Input Panel -->
+    <section class="bg-slate-900/70 backdrop-blur border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-indigo-950/30">
+      <h2 class="text-lg font-semibold text-white mb-5 flex items-center gap-2">
+        <span class="w-1 h-5 bg-indigo-500 rounded-full"></span>
+        Parameter Input
+      </h2>
+
+      <form id="nrForm" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-slate-300 mb-2">
+            Fungsi <span class="mono text-indigo-300">f(x)</span>
+          </label>
+          <input type="text" id="fx" value="x^3 - x - 2"
+                 placeholder="contoh: x^2 - 4, sin(x) - x/2, exp(x) - 3*x"
+                 class="mono w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-100
+                        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                        placeholder:text-slate-600 transition" />
+          <p class="mt-1.5 text-xs text-slate-500">
+            Operator: <span class="mono text-slate-400">+ - * / ^</span> ·
+            Fungsi: <span class="mono text-slate-400">sin, cos, tan, exp, log, sqrt, abs, ...</span>
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Tebakan Awal <span class="mono text-indigo-300">x₀</span></label>
+          <input type="number" step="any" id="x0" value="1.5"
+                 class="mono w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-100
+                        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Toleransi Error <span class="mono text-indigo-300">ε</span></label>
+          <input type="number" step="any" id="tol" value="0.0001"
+                 class="mono w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-100
+                        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
+        </div>
+
+        <div class="md:col-span-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+          <div class="flex-1">
+            <label class="block text-sm font-medium text-slate-300 mb-2">Maksimum Iterasi</label>
+            <input type="number" min="1" step="1" id="maxIter" value="20"
+                   class="mono w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-lg text-slate-100
+                          focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
+          </div>
+          <button type="submit"
+                  class="sm:mt-7 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700
+                         text-white font-semibold rounded-lg shadow-lg shadow-indigo-900/50
+                         transition-all duration-200 flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Hitung & Visualisasikan
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Banner -->
+    <div id="banner" class="hidden mt-6"></div>
+
+    <!-- Output Section -->
+    <section id="output" class="hidden mt-8 space-y-6 fade-in">
+
+      <!-- Rumus -->
+      <div class="bg-slate-900/70 backdrop-blur border border-slate-800 rounded-2xl p-6 sm:p-8">
+        <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <span class="w-1 h-5 bg-indigo-500 rounded-full"></span>
+          Rumus & Turunan Otomatis
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-4">
+            <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">Fungsi</div>
+            <div class="mono text-indigo-300 text-lg" id="fxDisplay">—</div>
+          </div>
+          <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-4">
+            <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">Turunan Pertama f′(x)</div>
+            <div class="mono text-indigo-300 text-lg" id="dfxDisplay">—</div>
+          </div>
+        </div>
+        <div class="mt-4 p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-lg">
+          <div class="text-xs uppercase tracking-wider text-indigo-300 mb-1">Rumus Iterasi Newton-Raphson</div>
+          <div class="mono text-slate-200 text-base">
+            x<sub>n+1</sub> = x<sub>n</sub> − f(x<sub>n</sub>) / f′(x<sub>n</sub>)
+          </div>
+        </div>
+      </div>
+
+      <!-- Grafik Visualisasi -->
+      <div class="bg-slate-900/70 backdrop-blur border border-slate-800 rounded-2xl p-6 sm:p-8">
+        <h2 class="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+          <span class="w-1 h-5 bg-indigo-500 rounded-full"></span>
+          Visualisasi Geometris
+        </h2>
+        <p class="text-sm text-slate-400 mb-4">
+          Grafik menampilkan kurva <span class="mono text-indigo-300">f(x)</span>, titik iterasi
+          <span class="inline-block w-2 h-2 rounded-full bg-orange-400 align-middle"></span>,
+          garis singgung <span class="inline-block w-4 h-0.5 bg-orange-400 align-middle"></span>,
+          dan akar akhir <span class="inline-block w-2 h-2 rounded-full bg-rose-500 align-middle"></span>.
+        </p>
+        <div class="chart-container bg-slate-950/60 border border-slate-800 rounded-lg p-3">
+          <canvas id="nrChart"></canvas>
+        </div>
+        <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+          <div class="flex items-center gap-2"><span class="w-4 h-0.5 bg-indigo-400"></span><span class="text-slate-400">Kurva f(x)</span></div>
+          <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-orange-400"></span><span class="text-slate-400">Titik (xₙ, f(xₙ))</span></div>
+          <div class="flex items-center gap-2"><span class="w-4 h-0.5 bg-orange-400/70 border-t border-dashed border-orange-400"></span><span class="text-slate-400">Garis Singgung</span></div>
+          <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-rose-500"></span><span class="text-slate-400">Akar Akhir</span></div>
+        </div>
+      </div>
+
+      <!-- Panel Analisis & Edukasi -->
+      <div class="bg-slate-900/70 backdrop-blur border border-slate-800 rounded-2xl p-6 sm:p-8">
+        <h2 class="text-lg font-semibold text-white mb-5 flex items-center gap-2">
+          <span class="w-1 h-5 bg-indigo-500 rounded-full"></span>
+          Analisis Hasil & Edukasi Numerik
+        </h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- Ringkasan Prediksi -->
+          <div class="info-card bg-slate-950/60 border border-slate-800 rounded-xl p-5">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center">
+                <svg class="w-4 h-4 text-indigo-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              </div>
+              <h3 class="font-semibold text-white">Ringkasan Prediksi</h3>
+            </div>
+            <div id="summaryText" class="text-sm text-slate-300 leading-relaxed space-y-2"></div>
+          </div>
+
+          <!-- Laju Konvergensi -->
+          <div class="info-card bg-slate-950/60 border border-slate-800 rounded-xl p-5">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+              </div>
+              <h3 class="font-semibold text-white">Analisis Laju Konvergensi</h3>
+            </div>
+            <div id="convergenceText" class="text-sm text-slate-300 leading-relaxed space-y-2"></div>
+          </div>
+
+          <!-- Karakteristik Persamaan -->
+          <div class="info-card bg-slate-950/60 border border-slate-800 rounded-xl p-5">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+                <svg class="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+              </div>
+              <h3 class="font-semibold text-white">Karakteristik Persamaan</h3>
+            </div>
+            <div id="characteristicText" class="text-sm text-slate-300 leading-relaxed space-y-2"></div>
+          </div>
+
+          <!-- Panduan & Peringatan -->
+          <div class="info-card bg-slate-950/60 border border-slate-800 rounded-xl p-5">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center">
+                <svg class="w-4 h-4 text-rose-300" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              </div>
+              <h3 class="font-semibold text-white">Panduan & Peringatan</h3>
+            </div>
+            <div id="warningText" class="text-sm text-slate-300 leading-relaxed space-y-2"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabel Iterasi -->
+      <div class="bg-slate-900/70 backdrop-blur border border-slate-800 rounded-2xl p-6 sm:p-8">
+        <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <span class="w-1 h-5 bg-indigo-500 rounded-full"></span>
+          Tabel Iterasi Step-by-Step
+        </h2>
+        <div class="table-wrap overflow-x-auto rounded-lg border border-slate-800">
+          <table class="w-full text-sm">
+            <thead class="bg-indigo-600 text-white sticky top-0">
+              <tr>
+                <th class="px-4 py-3 text-left font-semibold">n</th>
+                <th class="px-4 py-3 text-left font-semibold">x<sub>n</sub></th>
+                <th class="px-4 py-3 text-left font-semibold">f(x<sub>n</sub>)</th>
+                <th class="px-4 py-3 text-left font-semibold">f′(x<sub>n</sub>)</th>
+                <th class="px-4 py-3 text-left font-semibold">x<sub>n+1</sub></th>
+                <th class="px-4 py-3 text-left font-semibold">Error</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody" class="divide-y divide-slate-800"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Kesimpulan -->
+      <div id="conclusion" class="rounded-2xl p-6 border"></div>
+    </section>
+
+    <footer class="mt-12 text-center text-xs text-slate-500">
+      Dibuat untuk pembelajaran Metode Numerik · HTML + Tailwind CSS + math.js + Chart.js
+    </footer>
+  </div>
+
+<script>
+  const form = document.getElementById('nrForm');
+  const banner = document.getElementById('banner');
+  const output = document.getElementById('output');
+  const fxDisplay = document.getElementById('fxDisplay');
+  const dfxDisplay = document.getElementById('dfxDisplay');
+  const tableBody = document.getElementById('tableBody');
+  const conclusion = document.getElementById('conclusion');
+
+  let nrChart = null;
+
+  function showBanner(type, message) {
+    const styles = {
+      error:   'bg-rose-500/10 border-rose-500/40 text-rose-300',
+      warning: 'bg-amber-500/10 border-amber-500/40 text-amber-300',
+      success: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+    };
+    banner.className = `mt-6 px-5 py-4 rounded-xl border ${styles[type]} fade-in`;
+    banner.innerHTML = message;
+    banner.classList.remove('hidden');
+  }
+  function hideBanner() { banner.classList.add('hidden'); }
+
+  function fmt(n) {
+    if (!isFinite(n)) return String(n);
+    if (n === 0) return '0';
+    const abs = Math.abs(n);
+    if (abs < 1e-6 || abs >= 1e8) return n.toExponential(6);
+    return parseFloat(n.toPrecision(8)).toString();
+  }
+
+  function fmtShort(n) {
+    if (!isFinite(n)) return String(n);
+    if (n === 0) return '0';
+    const abs = Math.abs(n);
+    if (abs < 1e-4 || abs >= 1e6) return n.toExponential(3);
+    return parseFloat(n.toPrecision(5)).toString();
+  }
+
+  // ==================== RENDER CHART ====================
+  function renderChart(rows, fEval, x0, finalX, converged) {
+    const ctx = document.getElementById('nrChart').getContext('2d');
+
+    // Tentukan rentang x
+    const allX = rows.map(r => r.xn).concat(rows.map(r => r.xnext).filter(isFinite));
+    if (finalX !== null && isFinite(finalX)) allX.push(finalX);
+    allX.push(x0);
+
+    let xMin = Math.min(...allX);
+    let xMax = Math.max(...allX);
+    if (xMin === xMax) { xMin -= 2; xMax += 2; }
+    const margin = (xMax - xMin) * 0.25;
+    xMin -= margin; xMax += margin;
+
+    // Generate kurva f(x)
+    const steps = 300;
+    const curveData = [];
+    let yMin = Infinity, yMax = -Infinity;
+    for (let i = 0; i <= steps; i++) {
+      const x = xMin + (xMax - xMin) * i / steps;
+      let y;
+      try { y = fEval.evaluate({ x }); } catch { y = NaN; }
+      if (isFinite(y)) {
+        curveData.push({ x, y });
+        if (y < yMin) yMin = y;
+        if (y > yMax) yMax = y;
+      }
+    }
+
+    // Clamp y-range agar grafik tidak terlalu tinggi
+    if (yMax - yMin > 50) {
+      const mid = (yMax + yMin) / 2;
+      const span = 25;
+      yMin = mid - span; yMax = mid + span;
+    }
+    const yMargin = (yMax - yMin) * 0.15;
+    yMin -= yMargin; yMax += yMargin;
+
+    // Titik iterasi
+    const iterPoints = rows.map(r => ({ x: r.xn, y: r.fx }));
+
+    // Garis singgung (max 15 agar tidak berantakan)
+    const tangentDatasets = [];
+    const maxTangents = Math.min(rows.length, 15);
+    for (let i = 0; i < maxTangents; i++) {
+      const r = rows[i];
+      if (!isFinite(r.xnext)) continue;
+      const alpha = 0.9 - (i / maxTangents) * 0.5;
+      tangentDatasets.push({
+        label: `Garis singgung iterasi ${r.n}`,
+        data: [
+          { x: r.xn, y: r.fx },
+          { x: r.xnext, y: 0 }
+        ],
+        borderColor: `rgba(251, 146, 60, ${alpha})`,
+        backgroundColor: `rgba(251, 146, 60, ${alpha * 0.3})`,
+        borderWidth: 1.5,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        showLine: true,
+        fill: false,
+        tension: 0
+      });
+    }
+
+    // Titik akar akhir
+    const rootPoint = converged && finalX !== null && isFinite(finalX)
+      ? [{ x: finalX, y: 0 }]
+      : [];
+
+    // Hapus chart lama
+    if (nrChart) nrChart.destroy();
+
+    nrChart = new Chart(ctx, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: 'Kurva f(x)',
+            data: curveData,
+            borderColor: 'rgb(129, 140, 248)',
+            backgroundColor: 'rgba(129, 140, 248, 0.15)',
+            borderWidth: 2.5,
+            pointRadius: 0,
+            showLine: true,
+            fill: false,
+            tension: 0.2,
+            order: 2
+          },
+          ...tangentDatasets,
+          {
+            label: 'Titik iterasi (xₙ, f(xₙ))',
+            data: iterPoints,
+            borderColor: 'rgb(251, 146, 60)',
+            backgroundColor: 'rgba(251, 146, 60, 0.9)',
+            borderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 9,
+            showLine: false,
+            order: 1
+          },
+          {
+            label: 'Akar akhir',
+            data: rootPoint,
+            borderColor: 'rgb(244, 63, 94)',
+            backgroundColor: 'rgba(244, 63, 94, 1)',
+            borderWidth: 2.5,
+            pointRadius: 9,
+            pointHoverRadius: 12,
+            pointStyle: 'rectRot',
+            showLine: false,
+            order: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            borderColor: 'rgba(99, 102, 241, 0.5)',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#cbd5e1',
+            padding: 10,
+            callbacks: {
+              title: (items) => items[0].dataset.label,
+              label: (ctx) => `x = ${fmtShort(ctx.parsed.x)}, y = ${fmtShort(ctx.parsed.y)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            min: xMin,
+            max: xMax,
+            title: { display: true, text: 'Sumbu x', color: '#94a3b8', font: { size: 12, weight: '600' } },
+            grid: { color: 'rgba(71, 85, 105, 0.25)' },
+            ticks: { color: '#94a3b8' }
+          },
+          y: {
+            type: 'linear',
+            min: yMin,
+            max: yMax,
+            title: { display: true, text: 'f(x)', color: '#94a3b8', font: { size: 12, weight: '600' } },
+            grid: { color: 'rgba(71, 85, 105, 0.25)' },
+            ticks: { color: '#94a3b8' }
+          }
+        }
+      },
+      plugins: [{
+        id: 'axisLines',
+        beforeDraw: (chart) => {
+          const { ctx, chartArea, scales } = chart;
+          ctx.save();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+          // Sumbu x (y=0)
+          if (scales.y.min <= 0 && scales.y.max >= 0) {
+            const y0 = scales.y.getPixelForValue(0);
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, y0);
+            ctx.lineTo(chartArea.right, y0);
+            ctx.stroke();
+          }
+          // Sumbu y (x=0)
+          if (scales.x.min <= 0 && scales.x.max >= 0) {
+            const x0 = scales.x.getPixelForValue(0);
+            ctx.beginPath();
+            ctx.moveTo(x0, chartArea.top);
+            ctx.lineTo(x0, chartArea.bottom);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }]
+    });
+  }
+
+  // ==================== ANALISIS ====================
+  function renderAnalysis(rows, finalX, converged, fEval, dfEval, d2fEval, fxRaw, x0, tol, maxIter) {
+    const summary = document.getElementById('summaryText');
+    const convergence = document.getElementById('convergenceText');
+    const characteristic = document.getElementById('characteristicText');
+    const warning = document.getElementById('warningText');
+
+    // --- Ringkasan Prediksi ---
+    if (converged && finalX !== null && isFinite(finalX)) {
+      let fAtRoot;
+      try { fAtRoot = fEval.evaluate({ x: finalX }); } catch { fAtRoot = NaN; }
+      summary.innerHTML = `
+        <p>Akar yang diprediksi adalah <span class="math-inline">x ≈ ${fmt(finalX)}</span> dalam
+           <strong>${rows.length}</strong> iterasi.</p>
+        <p>Nilai fungsi di akar: <span class="math-inline">f(${fmtShort(finalX)}) ≈ ${fmt(fAtRoot)}</span>
+           ${Math.abs(fAtRoot) < 1e-8 ? '— nilai ini <em>sangat mendekati nol</em> ✓' : '— mendekati nol.'}</p>
+        <p>Tebakan awal <span class="math-inline">x₀ = ${fmt(x0)}</span> dengan toleransi
+           <span class="math-inline">ε = ${tol}</span> berhasil menghasilkan konvergensi.</p>
+      `;
+    } else {
+      summary.innerHTML = `
+        <p>Metode <strong>belum konvergen</strong> setelah ${rows.length} iterasi (maksimum = ${maxIter}).</p>
+        <p>Perkiraan terakhir: <span class="math-inline">x ≈ ${fmt(rows[rows.length-1]?.xnext ?? x0)}</span>.</p>
+        <p>Cobalah ubah tebakan awal atau naikkan batas iterasi.</p>
+      `;
+    }
+
+    // --- Laju Konvergensi ---
+    let convergenceHTML = '';
+    if (converged && rows.length >= 2) {
+      const errors = rows.map(r => r.err).filter(isFinite);
+      const nIter = rows.length;
+
+      // Hitung rasio konvergensi kuadratik: |e_{n+1}| / |e_n|^2
+      const ratios = [];
+      for (let i = 0; i < errors.length - 1; i++) {
+        if (errors[i] > 1e-14) {
+          ratios.push(errors[i+1] / (errors[i] * errors[i]));
+        }
+      }
+
+      let orderType = '';
+      let orderDesc = '';
+      if (nIter <= 4) {
+        orderType = 'sangat cepat (konvergensi kuadratik)';
+        orderDesc = `Hanya <strong>${nIter} iterasi</strong> dibutuhkan — ini adalah ciri khas konvergensi kuadratik Newton-Raphson, di mana jumlah digit benar kira-kira <em>berdua kali lipat</em> setiap iterasi.`;
+      } else if (nIter <= 8) {
+        orderType = 'cepat';
+        orderDesc = `Dibutuhkan <strong>${nIter} iterasi</strong> — metode bekerja dengan baik, menunjukkan penurunan error yang signifikan di setiap langkah.`;
+      } else {
+        orderType = 'relatif lambat';
+        orderDesc = `Dibutuhkan <strong>${nIter} iterasi</strong> — konvergensi lebih lambat dari biasanya. Hal ini bisa terjadi jika tebakan awal kurang ideal, akar bersifat multi (turunan mendekati nol di akar), atau fungsi memiliki kelengkungan tinggi.`;
+      }
+
+      convergenceHTML = `
+        <p>Metode Newton-Raphson secara teori memiliki <strong>konvergensi kuadratik</strong> (orde 2) untuk akar sederhana. Untuk persamaan ini, laju konvergensinya tergolong <strong>${orderType}</strong>.</p>
+        <p>${orderDesc}</p>
+        ${ratios.length > 0 ? `
+          <p>Rasio konvergensi kuadratik <span class="math-inline">|e<sub>n+1</sub>| / |e<sub>n</sub>|²</span>
+          pada iterasi akhir ≈ <span class="math-inline">${fmtShort(ratios[ratios.length-1])}</span>
+          ${ratios.length > 1 ? `(cenderung konstan ≈ ${fmtShort(ratios[ratios.length-1])})` : ''} —
+          mengonfirmasi perilaku kuadratik.</p>
+        ` : ''}
+      `;
+    } else if (!converged) {
+      convergenceHTML = `
+        <p>Metode <strong>tidak konvergen</strong> dalam batas iterasi yang diizinkan.</p>
+        <p>Perhatikan pada tabel bahwa error tidak menurun secara monoton — ini mengindikasikan bahwa tebakan awal mungkin berada di wilayah yang kurang menguntungkan (misalnya dekat titik stasioner atau di luar basin of attraction akar).</p>
+      `;
+    } else {
+      convergenceHTML = `<p>Konvergen dalam satu iterasi — tebakan awal sudah sangat dekat dengan akar.</p>`;
+    }
+    convergence.innerHTML = convergenceHTML;
+
+    // --- Karakteristik Persamaan ---
+    let charHTML = '';
+    if (finalX !== null && isFinite(finalX)) {
+      let dfAtRoot, d2fAtRoot;
+      try { dfAtRoot = dfEval.evaluate({ x: finalX }); } catch { dfAtRoot = NaN; }
+      try { d2fAtRoot = d2fEval ? d2fEval.evaluate({ x: finalX }) : NaN; } catch { d2fAtRoot = NaN; }
+
+      const absDf = Math.abs(dfAtRoot);
+      let slopeDesc, slopeColor;
+      if (absDf < 0.05) {
+        slopeDesc = 'sangat kecil (mendekati nol)';
+        slopeColor = 'text-rose-300';
+      } else if (absDf < 0.5) {
+        slopeDesc = 'relatif kecil';
+        slopeColor = 'text-amber-300';
+      } else if (absDf < 3) {
+        slopeDesc = 'sedang (ideal)';
+        slopeColor = 'text-emerald-300';
+      } else {
+        slopeDesc = 'besar (curam)';
+        slopeColor = 'text-indigo-300';
+      }
+
+      let curvatureDesc = '';
+      if (isFinite(d2fAtRoot)) {
+        if (Math.abs(d2fAtRoot) < 0.1) curvatureDesc = 'Kurva hampir linear di sekitar akar (turunan kedua ≈ 0) — kondisi ideal untuk Newton-Raphson.';
+        else if (Math.abs(d2fAtRoot) < 2) curvatureDesc = 'Kurva memiliki kelengkungan sedang di sekitar akar — metode bekerja dengan baik.';
+        else curvatureDesc = 'Kurva memiliki kelengkungan tinggi di sekitar akar — konvergensi bisa sedikit melambat karena pendekatan linear menjadi kurang akurat.';
+      }
+
+      charHTML = `
+        <p>Nilai turunan pertama di akar: <span class="math-inline">f'(${fmtShort(finalX)}) ≈ ${fmtShort(dfAtRoot)}</span>
+           — tergolong <span class="${slopeColor} font-semibold">${slopeDesc}</span>.</p>
+        <p>${absDf < 0.1
+          ? '⚠️ Karena f\'(x) mendekati nol di akar, akar ini bersifat <em>ganda/multi</em>. Newton-Raphson pada akar multi hanya konvergen <strong>linear</strong>, bukan kuadratik. Pertimbangkan modifikasi metode jika akurasi tinggi dibutuhkan.'
+          : 'Karena f\'(x) tidak mendekati nol, akar bersifat <em>sederhana</em> — syarat ideal untuk konvergensi kuadratik Newton-Raphson terpenuhi.'
+        }</p>
+        ${curvatureDesc ? `<p>${curvatureDesc}</p>` : ''}
+      `;
+    } else {
+      charHTML = `<p>Tidak dapat menganalisis karakteristik karena metode tidak konvergen ke suatu akar.</p>`;
+    }
+    characteristic.innerHTML = charHTML;
+
+    // --- Panduan & Peringatan ---
+    let warnHTML = `
+      <p class="bullet">Newton-Raphson <strong>gagal</strong> jika <span class="math-inline">f'(x<sub>n</sub>) = 0</span>
+         pada iterasi manapun (terjadi pembagian dengan nol). Pada grafik, hal ini terlihat sebagai titik singgung horizontal.</p>
+      <p class="bullet">Jika grafik menunjukkan kurva <strong>mendatar</strong> di sekitar tebakan awal,
+         cobalah <span class="math-inline">x₀</span> yang berbeda agar garis singgung memotong sumbu-x lebih dekat ke akar.</p>
+      <p class="bullet">Untuk fungsi dengan <strong>banyak ekstrem lokal</strong> (seperti trigonometri atau polinomial derajat tinggi),
+         metode bisa konvergen ke akar yang tidak diharapkan, atau bahkan <em>divergen</em> (berosilasi tak menentu).</p>
+      <p class="bullet">Teorema konvergensi lokal menjamin Newton-Raphson konvergen jika
+         <span class="math-inline">x₀</span> cukup dekat ke akar sederhana dan <span class="math-inline">f'(x) ≠ 0</span> di sekitar akar.</p>
+    `;
+    warning.innerHTML = warnHTML;
+  }
+
+  // ==================== MAIN ====================
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    hideBanner();
+    output.classList.add('hidden');
+    tableBody.innerHTML = '';
+
+    const fxRaw = document.getElementById('fx').value.trim();
+    const x0    = parseFloat(document.getElementById('x0').value);
+    const tol   = parseFloat(document.getElementById('tol').value);
+    const maxIter = parseInt(document.getElementById('maxIter').value, 10);
+
+    if (!fxRaw) return showBanner('error', '⚠️ Fungsi f(x) tidak boleh kosong.');
+    if (isNaN(x0)) return showBanner('error', '⚠️ Tebakan awal x₀ harus berupa angka.');
+    if (isNaN(tol) || tol <= 0) return showBanner('error', '⚠️ Toleransi harus angka positif.');
+    if (isNaN(maxIter) || maxIter < 1) return showBanner('error', '⚠️ Maksimum iterasi harus ≥ 1.');
+
+    let expr, dExpr, d2Expr;
+    try {
+      expr = math.parse(fxRaw);
+      dExpr = math.derivative(expr, 'x');
+      try { d2Expr = math.derivative(dExpr, 'x'); } catch { d2Expr = null; }
+    } catch (err) {
+      return showBanner('error', `❌ Fungsi tidak valid: <span class="mono">${err.message}</span>`);
+    }
+
+    const fEval  = expr.compile();
+    const dfEval = dExpr.compile();
+    const d2fEval = d2Expr ? d2Expr.compile() : null;
+
+    fxDisplay.textContent  = 'f(x) = ' + expr.toString();
+    dfxDisplay.textContent = "f'(x) = " + dExpr.toString();
+
+    // Newton-Raphson
+    const rows = [];
+    let x = x0;
+    let converged = false;
+    let finalIter = 0;
+    let stoppedReason = '';
+    let finalX = null;
+
+    for (let n = 0; n < maxIter; n++) {
+      let fx, dfx;
+      try {
+        fx  = fEval.evaluate({ x });
+        dfx = dfEval.evaluate({ x });
+      } catch (err) {
+        stoppedReason = `Evaluasi gagal pada iterasi ${n+1}: ${err.message}`;
+        break;
+      }
+
+      if (!isFinite(fx) || !isFinite(dfx)) {
+        stoppedReason = `Nilai tak hingga/NaN terdeteksi pada iterasi ${n+1}.`;
+        break;
+      }
+
+      if (Math.abs(dfx) < 1e-14) {
+        stoppedReason = `Turunan f'(x) ≈ 0 pada iterasi ${n+1} (x = ${fmt(x)}). Algoritma berhenti karena tidak dapat membagi dengan nol.`;
+        rows.push({ n: n+1, xn: x, fx, dfx, xnext: NaN, err: NaN });
+        break;
+      }
+
+      const xnext = x - fx / dfx;
+      const err = Math.abs(xnext - x);
+      rows.push({ n: n+1, xn: x, fx, dfx, xnext, err });
+      finalIter = n + 1;
+
+      if (err < tol) {
+        converged = true;
+        finalX = xnext;
+        break;
+      }
+      x = xnext;
+    }
+
+    // Render tabel
+    rows.forEach((r, idx) => {
+      const tr = document.createElement('tr');
+      tr.className = idx % 2 === 0 ? 'bg-slate-950/40' : 'bg-slate-900/40';
+      tr.classList.add('hover:bg-indigo-500/10', 'transition-colors');
+      tr.innerHTML = `
+        <td class="px-4 py-3 font-semibold text-indigo-300">${r.n}</td>
+        <td class="px-4 py-3 mono text-slate-200">${fmt(r.xn)}</td>
+        <td class="px-4 py-3 mono text-slate-300">${fmt(r.fx)}</td>
+        <td class="px-4 py-3 mono text-slate-300">${fmt(r.dfx)}</td>
+        <td class="px-4 py-3 mono text-slate-100 font-medium">${isFinite(r.xnext) ? fmt(r.xnext) : '—'}</td>
+        <td class="px-4 py-3 mono ${r.err < tol ? 'text-emerald-400 font-semibold' : 'text-slate-400'}">${isFinite(r.err) ? fmt(r.err) : '—'}</td>
+      `;
+      tableBody.appendChild(tr);
+    });
+
+    // Render chart
+    renderChart(rows, fEval, x0, finalX, converged);
+
+    // Render analisis
+    renderAnalysis(rows, finalX, converged, fEval, dfEval, d2fEval, fxRaw, x0, tol, maxIter);
+
+    // Kesimpulan
+    conclusion.classList.remove('hidden');
+    if (converged) {
+      conclusion.className = 'rounded-2xl p-6 border bg-emerald-500/10 border-emerald-500/40 text-emerald-200 fade-in';
+      conclusion.innerHTML = `
+        <div class="flex items-start gap-3">
+          <div class="mt-1 w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <div>
+            <div class="font-semibold text-emerald-100 text-lg">✓ Konvergen — Akar Ditemukan</div>
+            <div class="mt-2 mono text-slate-100">
+              x ≈ <span class="text-emerald-300 font-bold">${fmt(finalX)}</span>
+            </div>
+            <div class="text-sm text-emerald-200/80 mt-1">
+              Dicapai setelah <span class="font-semibold">${finalIter}</span> iterasi dengan error ${fmt(rows[rows.length-1].err)} &lt; ε = ${tol}.
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      conclusion.className = 'rounded-2xl p-6 border bg-amber-500/10 border-amber-500/40 text-amber-200 fade-in';
+      conclusion.innerHTML = `
+        <div class="flex items-start gap-3">
+          <div class="mt-1 w-6 h-6 rounded-full bg-amber-500/20 border border-amber-400 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.74-3L13.74 4a2 2 0 00-3.48 0L3.2 16a2 2 0 001.73 3z"/></svg>
+          </div>
+          <div>
+            <div class="font-semibold text-amber-100 text-lg">⚠ Belum Konvergen</div>
+            <div class="mt-1 text-sm text-amber-200/90">${stoppedReason || `Maksimum iterasi (${maxIter}) tercapai tanpa memenuhi toleransi ε = ${tol}.`}</div>
+            <div class="text-sm text-amber-200/80 mt-1">
+              Cobalah tebakan awal <span class="mono">x₀</span> yang lebih dekat ke akar, atau naikkan jumlah iterasi maksimum.
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    output.classList.remove('hidden');
+    setTimeout(() => output.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  });
+</script>
+</body>
+</html>
