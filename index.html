@@ -416,88 +416,91 @@
     return parseFloat(n.toPrecision(5)).toString();
   }
 
-  // ==================== EXPORT CSV (UPDATED) ====================
-  function escapeCsvValue(val) {
-    if (val === null || val === undefined) return '';
-    const str = String(val);
-    if (/[",\n\r]/.test(str)) {
-      return '"' + str.replace(/"/g, '""') + '"';
-    }
-    return str;
+  // ==================== EXPORT CSV (DELIMITER ;) ====================
+function escapeCsvValue(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  // Escape jika ada titik koma, quotes, atau newline
+  if (/[";\n\r]/.test(str)) {
+    return '"' + str.replace(/"/g, '""') + '"';
   }
-  
-  function formatNumber(num) {
-    if (!isFinite(num)) return '';
-    if (num === 0) return '0.00000000';
-    // Gunakan toFixed(8) untuk menghindari notasi ilmiah dan menyeragamkan desimal
-    return parseFloat(num).toFixed(8);
+  return str;
+}
+
+function formatNumber(num) {
+  if (!isFinite(num)) return '';
+  if (num === 0) return '0.00000000';
+  // .toFixed() di JS SELALU pakai titik (.) sebagai decimal separator
+  // sehingga tidak bentrok dengan delimiter titik koma (;)
+  return parseFloat(num).toFixed(8);
+}
+
+function downloadCSV(rows, fxRaw, x0, tol, converged, finalX, finalIter) {
+  if (!rows || rows.length === 0) {
+    showToast('warning', 'Tidak ada data iterasi untuk diunduh.');
+    return;
   }
-  
-  function downloadCSV(rows, fxRaw, x0, tol, converged, finalX, finalIter) {
-    if (!rows || rows.length === 0) {
-      showToast('warning', 'Tidak ada data iterasi untuk diunduh.');
-      return;
-    }
-  
-    const BOM = '\uFEFF';
-    const csvRows = [];
-    
-    // Metadata header
-    csvRows.push('Laporan Analisis Newton-Raphson');
-    csvRows.push('Tanggal,' + escapeCsvValue(new Date().toLocaleString('id-ID')));
-    csvRows.push('Fungsi f(x),' + escapeCsvValue(fxRaw));
-    csvRows.push('Tebakan Awal (x0),' + formatNumber(x0));
-    csvRows.push('Toleransi Error,' + formatNumber(tol));
-    
-    // Status
-    let statusText;
-    if (converged && finalX !== null && isFinite(finalX)) {
-      statusText = `Akar ditemukan pada x = ${formatNumber(finalX)} dalam ${finalIter} iterasi`;
-    } else {
-      statusText = `Belum konvergen setelah ${rows.length} iterasi (maksimum tercapai)`;
-    }
-    csvRows.push('Status,' + escapeCsvValue(statusText));
-    
-    // Baris kosong sebelum tabel
-    csvRows.push('');
-    
-    // Header kolom tabel
-    const headers = ['Iterasi (n)', 'x_n', 'f(x_n)', 'f\'(x_n)', 'x_{n+1}', 'Error'];
-    csvRows.push(headers.map(escapeCsvValue).join(','));
-    
-    // Data rows dengan format angka seragam
-    rows.forEach(r => {
-      const row = [
-        r.n, // Iterasi tidak diformat (integer)
-        formatNumber(r.xn),
-        formatNumber(r.fx),
-        formatNumber(r.dfx),
-        formatNumber(r.xnext),
-        formatNumber(r.err)
-      ];
-      csvRows.push(row.map(escapeCsvValue).join(','));
-    });
-  
-    const csvContent = BOM + csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-  
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filename = `laporan-iterasi-${timestamp}.csv`;
-  
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  
-    showToast('success', `Laporan CSV berhasil diunduh: <span class="font-mono text-xs">${filename}</span>`);
+
+  const DELIM = ';'; // Delimiter untuk Excel regional Indonesia/Eropa
+  const BOM = '\uFEFF';
+  const csvRows = [];
+
+  // ===== Metadata Header =====
+  csvRows.push('Laporan Analisis Newton-Raphson');
+  csvRows.push('Tanggal' + DELIM + escapeCsvValue(new Date().toLocaleString('id-ID')));
+  csvRows.push('Fungsi f(x)' + DELIM + escapeCsvValue(fxRaw));
+  csvRows.push('Tebakan Awal (x0)' + DELIM + formatNumber(x0));
+  csvRows.push('Toleransi Error' + DELIM + formatNumber(tol));
+
+  // Status
+  let statusText;
+  if (converged && finalX !== null && isFinite(finalX)) {
+    statusText = `Akar ditemukan pada x = ${formatNumber(finalX)} dalam ${finalIter} iterasi`;
+  } else {
+    statusText = `Belum konvergen setelah ${rows.length} iterasi (maksimum tercapai)`;
   }
-  
+  csvRows.push('Status' + DELIM + escapeCsvValue(statusText));
+
+  // Baris kosong pemisah
+  csvRows.push('');
+
+  // ===== Header Kolom Tabel =====
+  const headers = ['Iterasi (n)', 'x_n', 'f(x_n)', 'f\'(x_n)', 'x_{n+1}', 'Error'];
+  csvRows.push(headers.map(escapeCsvValue).join(DELIM));
+
+  // ===== Data Rows =====
+  rows.forEach(r => {
+    const row = [
+      r.n,                    // Iterasi (integer, tidak diformat)
+      formatNumber(r.xn),     // Desimal tetap pakai titik (.)
+      formatNumber(r.fx),
+      formatNumber(r.dfx),
+      formatNumber(r.xnext),
+      formatNumber(r.err)
+    ];
+    csvRows.push(row.map(escapeCsvValue).join(DELIM));
+  });
+
+  // ===== Generate File =====
+  const csvContent = BOM + csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const filename = `laporan-iterasi-${timestamp}.csv`;
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  showToast('success', `Laporan CSV berhasil diunduh: <span class="font-mono text-xs">${filename}</span>`);
+}  
   downloadCsvBtn.addEventListener('click', () => {
   const fxRaw = document.getElementById('fx').value.trim();
   const x0 = parseFloat(document.getElementById('x0').value);
