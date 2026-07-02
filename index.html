@@ -300,6 +300,9 @@
 
   let nrChart = null;
   let lastRows = [];
+  let lastConverged = false;      
+  let lastFinalX = null;          
+  let lastFinalIter = 0;          
 
   // ==================== TOAST NOTIFICATION SYSTEM ====================
   function showToast(type, message, duration = 5000) {
@@ -413,7 +416,7 @@
     return parseFloat(n.toPrecision(5)).toString();
   }
 
-  // ==================== EXPORT CSV ====================
+  // ==================== EXPORT CSV (UPDATED) ====================
   function escapeCsvValue(val) {
     if (val === null || val === undefined) return '';
     const str = String(val);
@@ -422,41 +425,66 @@
     }
     return str;
   }
-
-  function downloadCSV(rows, fxRaw) {
+  
+  function formatNumber(num) {
+    if (!isFinite(num)) return '';
+    if (num === 0) return '0.00000000';
+    // Gunakan toFixed(8) untuk menghindari notasi ilmiah dan menyeragamkan desimal
+    return parseFloat(num).toFixed(8);
+  }
+  
+  function downloadCSV(rows, fxRaw, x0, tol, converged, finalX, finalIter) {
     if (!rows || rows.length === 0) {
       showToast('warning', 'Tidak ada data iterasi untuk diunduh.');
       return;
     }
-
+  
     const BOM = '\uFEFF';
+    const csvRows = [];
+    
+    // Metadata header
+    csvRows.push('Laporan Analisis Newton-Raphson');
+    csvRows.push('Tanggal,' + escapeCsvValue(new Date().toLocaleString('id-ID')));
+    csvRows.push('Fungsi f(x),' + escapeCsvValue(fxRaw));
+    csvRows.push('Tebakan Awal (x0),' + formatNumber(x0));
+    csvRows.push('Toleransi Error,' + formatNumber(tol));
+    
+    // Status
+    let statusText;
+    if (converged && finalX !== null && isFinite(finalX)) {
+      statusText = `Akar ditemukan pada x = ${formatNumber(finalX)} dalam ${finalIter} iterasi`;
+    } else {
+      statusText = `Belum konvergen setelah ${rows.length} iterasi (maksimum tercapai)`;
+    }
+    csvRows.push('Status,' + escapeCsvValue(statusText));
+    
+    // Baris kosong sebelum tabel
+    csvRows.push('');
+    
+    // Header kolom tabel
     const headers = ['Iterasi (n)', 'x_n', 'f(x_n)', 'f\'(x_n)', 'x_{n+1}', 'Error'];
-    const csvRows = [headers.map(escapeCsvValue).join(',')];
-
+    csvRows.push(headers.map(escapeCsvValue).join(','));
+    
+    // Data rows dengan format angka seragam
     rows.forEach(r => {
       const row = [
-        r.n,
-        isFinite(r.xn) ? r.xn : '',
-        isFinite(r.fx) ? r.fx : '',
-        isFinite(r.dfx) ? r.dfx : '',
-        isFinite(r.xnext) ? r.xnext : '',
-        isFinite(r.err) ? r.err : ''
+        r.n, // Iterasi tidak diformat (integer)
+        formatNumber(r.xn),
+        formatNumber(r.fx),
+        formatNumber(r.dfx),
+        formatNumber(r.xnext),
+        formatNumber(r.err)
       ];
       csvRows.push(row.map(escapeCsvValue).join(','));
     });
-
-    csvRows.push('');
-    csvRows.push('# Fungsi,' + escapeCsvValue(fxRaw));
-    csvRows.push('# Total Iterasi,' + rows.length);
-    csvRows.push('# Tanggal,' + escapeCsvValue(new Date().toLocaleString('id-ID')));
-
+  
     const csvContent = BOM + csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
+  
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const filename = `laporan-iterasi-${timestamp}.csv`;
-
+  
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
@@ -464,16 +492,18 @@
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
+  
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-
+  
     showToast('success', `Laporan CSV berhasil diunduh: <span class="font-mono text-xs">${filename}</span>`);
   }
-
+  
   downloadCsvBtn.addEventListener('click', () => {
-    const fxRaw = document.getElementById('fx').value.trim();
-    downloadCSV(lastRows, fxRaw);
-  });
+  const fxRaw = document.getElementById('fx').value.trim();
+  const x0 = parseFloat(document.getElementById('x0').value);
+  const tol = parseFloat(document.getElementById('tol').value);
+  downloadCSV(lastRows, fxRaw, x0, tol, lastConverged, lastFinalX, lastFinalIter);
+});
 
   // ==================== RENDER CHART (LIGHT MODE) ====================
   function renderChart(rows, fEval, x0, finalX, converged) {
@@ -879,6 +909,9 @@
     });
 
     lastRows = rows;
+    lastConverged = converged;      
+    lastFinalX = finalX;            
+    lastFinalIter = finalIter;      
     if (rows.length > 0) downloadCsvBtn.disabled = false;
 
     renderChart(rows, fEval, x0, finalX, converged);
