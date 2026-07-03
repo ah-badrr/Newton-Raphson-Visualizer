@@ -22,7 +22,7 @@
 
 ## 🚀 Live Demo
 
-> 🔗 **https://[your-username].github.io/newton-raphson-visualizer/**
+> 🔗 **https://ah-badrr.github.io/Newton-Raphson-Visualizer//**
 
 *Deployed via GitHub Pages — zero backend, instant load.*
 
