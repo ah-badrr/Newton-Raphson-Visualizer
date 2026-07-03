@@ -1,0 +1,123 @@
+/* ========================================
+   Newton-Raphson Solver - Custom Styles
+   ======================================== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+.fade-in {
+  animation: fadeIn .5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #6366f1;
+  border-radius: 4px;
+}
+
+.chart-container {
+  position: relative;
+  height: 480px;
+}
+
+@media (max-width: 640px) {
+  .chart-container {
+    height: 340px;
+  }
+}
+
+.info-card {
+  transition: all .3s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, .4);
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.15);
+}
+
+.bullet::before {
+  content: "▸";
+  color: #6366f1;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.katex {
+  color: #1e293b;
+  font-size: 1.15em;
+}
+
+.katex-display {
+  margin: 0;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+.toast-enter {
+  animation: slideInRight .4s cubic-bezier(.21, 1.02, .73, 1) forwards;
+}
+
+.toast-exit {
+  animation: slideOutRight .3s ease-in forwards;
+}
+
+@keyframes progressShrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.toast-progress {
+  animation: progressShrink linear forwards;
+}
